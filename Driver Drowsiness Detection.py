@@ -1,13 +1,9 @@
-#!/usr/bin/env python
-from scipy.spatial import distance as dist
 from imutils.video import VideoStream
 from imutils import face_utils
-import argparse
 import imutils
 import time
 import dlib
-import math
-from cv2 import cv2
+import cv2
 import numpy as np
 from EAR import eye_aspect_ratio
 from MAR import mouth_aspect_ratio
@@ -46,10 +42,11 @@ image_points = np.array([
 (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
 (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
 
-EYE_AR_THRESH = 0.25
-MOUTH_AR_THRESH = 0.79
+EYE_AR_THRESH = 0.17
+MOUTH_AR_THRESH = 0.7
 EYE_AR_CONSEC_FRAMES = 3
 COUNTER = 0
+cap = cv2.VideoCapture(0)
 
 # grab the indexes of the facial landmarks for the mouth
 (mStart, mEnd) = (49, 68)
@@ -58,7 +55,7 @@ while True:
     # grab the frame from the threaded video stream, resize it to
     # have a maximum width of 400 pixels, and convert it to
     # grayscale
-    frame = vs.read()
+    ret, frame = cap.read()
     frame = imutils.resize(frame, width=1024, height=576)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     size = gray.shape
@@ -85,49 +82,36 @@ while True:
         shape = predictor(gray, rect)
         shape = face_utils.shape_to_np(shape)
 
-        # extract the left and right eye coordinates, then use the
-        # coordinates to compute the eye aspect ratio for both eyes
         leftEye = shape[lStart:lEnd]
         rightEye = shape[rStart:rEnd]
         leftEAR = eye_aspect_ratio(leftEye)
         rightEAR = eye_aspect_ratio(rightEye)
-        # average the eye aspect ratio together for both eyes
+
         ear = (leftEAR + rightEAR) / 2.0
 
-        # compute the convex hull for the left and right eye, then
-        # visualize each of the eyes
         leftEyeHull = cv2.convexHull(leftEye)
         rightEyeHull = cv2.convexHull(rightEye)
         cv2.drawContours(frame, [leftEyeHull], -1, (0, 255, 0), 1)
         cv2.drawContours(frame, [rightEyeHull], -1, (0, 255, 0), 1)
 
-        # check to see if the eye aspect ratio is below the blink
-        # threshold, and if so, increment the blink frame counter
         if ear < EYE_AR_THRESH:
             COUNTER += 1
-            # if the eyes were closed for a sufficient number of times
-            # then show the warning
+
             if COUNTER >= EYE_AR_CONSEC_FRAMES:
                 cv2.putText(frame, "Eyes Closed!", (500, 20),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-            # otherwise, the eye aspect ratio is not below the blink
-            # threshold, so reset the counter and alarm
+
         else:
             COUNTER = 0
 
         mouth = shape[mStart:mEnd]
-
         mouthMAR = mouth_aspect_ratio(mouth)
         mar = mouthMAR
-        # compute the convex hull for the mouth, then
-        # visualize the mouth
         mouthHull = cv2.convexHull(mouth)
 
         cv2.drawContours(frame, [mouthHull], -1, (0, 255, 0), 1)
-        cv2.putText(frame, "MAR: {:.2f}".format(mar), (650, 20), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+        cv2.putText(frame, "MAR: {:.2f}".format(mar), (650, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
-        # Draw text if mouth is open
         if mar > MOUTH_AR_THRESH:
             cv2.putText(frame, "Yawning!", (800, 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
