@@ -5,9 +5,25 @@ import time
 import dlib
 import cv2
 import numpy as np
+import serial
+import threading
 from EAR import eye_aspect_ratio
 from MAR import mouth_aspect_ratio
 from HeadPose import getHeadTiltAndCoords
+from playsound import playsound
+
+def get_co2():
+    arduino_port = '/dev/cu.usbmodem21301'  # 아두이노의 포트 이름을 지정하세요.
+    arduino_baudrate = 9600
+
+    arduino = serial.Serial(arduino_port, arduino_baudrate, timeout=1)
+    while True:
+        co2 = int(arduino.readline().decode('utf-8'))
+        if co2 >= 2000:
+            cv2.putText(frame, "Turn off heater", (250, 20), font, 0.7, (0, 0, 255), 2)
+
+th1 = threading.Thread(target = get_co2)
+th1.start()
 
 print("== 얼굴 좌표 데이터 불러 오는 중... ==")
 detector = dlib.get_frontal_face_detector()
@@ -37,8 +53,8 @@ image_points = np.array([
 
 EYE_AR_THRESH = 0.14
 MOUTH_AR_THRESH = 0.89
-EYE_AR_CONSEC_FRAMES = 5
-MOUTH_AR_CONSEC_FRAMES = 5
+EYE_AR_CONSEC_FRAMES = 8
+MOUTH_AR_CONSEC_FRAMES = 8
 EYE_COUNTER = 0
 MOUTH_COUNTER = 0
 cap = cv2.VideoCapture(0)
@@ -81,6 +97,7 @@ while True:
 
             if EYE_COUNTER >= EYE_AR_CONSEC_FRAMES:
                 cv2.putText(frame, "Eyes Closed!", (500, 20), font, 0.7, (0, 0, 255), 2)
+                playsound('warn2.mp3')
 
         else:
             COUNTER = 0
@@ -98,6 +115,7 @@ while True:
 
             if MOUTH_COUNTER >= MOUTH_AR_CONSEC_FRAMES:
                 cv2.putText(frame, "Yawning!", (800, 20), font, 0.7, (0, 0, 255), 2)
+                playsound('warn.mp3')
 
         else:
             MOUTH_COUNTER = 0
